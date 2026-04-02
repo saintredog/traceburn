@@ -1,0 +1,116 @@
+# TraceBurn User Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+# Copy this file to ~/.traceburn/config.yaml and fill in your details.
+# File permissions must be 600 (owner read/write only).
+#
+# This file contains NON-SENSITIVE configuration only.
+# PII (name, address, phone, email) is stored in the encrypted vault.
+# Credentials (API keys, bot tokens) go in config/email.env (see below).
+#
+# Usage: traceburn --config ~/.traceburn/config.yaml <command>
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Profile ──────────────────────────────────────────────────────────────────
+# Non-sensitive display label for this profile.
+# PII (real name, DOB, addresses) is stored in the encrypted vault — not here.
+
+profile:
+  display_name: "Primary Profile"    # Display name shown in traceburn status
+  profile_type: "primary"            # "primary" | "family_member"
+
+# ── Vault ─────────────────────────────────────────────────────────────────────
+# Paths to the encrypted SQLite database and proof screenshot directory.
+# These files contain encrypted data only — safe to back up, but keep private.
+# NOT SENSITIVE: paths only, no keys or PII.
+
+vault:
+  db_path: "~/.traceburn/data.ctdb"           # Encrypted SQLite database path
+  screenshots_dir: "~/.traceburn/proof"       # Encrypted proof screenshots directory
+
+# ── Vault Passphrase ──────────────────────────────────────────────────────────
+# DO NOT put your passphrase here. Set it as an environment variable:
+#   export CLEARTRACE_VAULT_PASSPHRASE='your-strong-passphrase'
+# Or you will be prompted interactively when you run any command.
+# The passphrase is NEVER stored to disk by TraceBurn.
+
+# ── Brokers ───────────────────────────────────────────────────────────────────
+# Controls which broker definitions are loaded and which regions are scanned.
+# NOT SENSITIVE.
+
+brokers:
+  list_path: "config/brokers.yaml"    # Path to broker definitions file
+  active_regions: ["US"]              # Regions to scan: "US" | "EU" | "UK" | "global"
+                                      # Add multiple: ["US", "EU"]
+
+# ── Scan ──────────────────────────────────────────────────────────────────────
+# Controls scan behavior and scheduling.
+# NOT SENSITIVE.
+
+scan:
+  schedule: "0 3 * * 0"              # Cron expression — default: 3 AM every Sunday
+                                     # Format: minute hour day month weekday
+  default_type: "full"               # "full" (all brokers) | "spot_check" (high-risk only)
+  concurrency: 3                     # Max concurrent broker scans (1–10)
+                                     # Lower = slower but less likely to trigger rate limits
+  request_timeout_seconds: 30        # Per-request Playwright/HTTP timeout in seconds
+  min_confidence_threshold: 0.5      # Only surface exposures with confidence ≥ this value
+                                     # Range: 0.0–1.0. Default 0.5 balances coverage vs noise.
+
+# ── Notifications ─────────────────────────────────────────────────────────────
+# Telegram bot integration for removal alerts.
+# SENSITIVE: bot_token and chat_id go in environment variables, not here.
+#   export CLEARTRACE_TELEGRAM_BOT_TOKEN='your-bot-token'
+#   export CLEARTRACE_TELEGRAM_CHAT_ID='your-chat-id'
+
+notifications:
+  enabled: true
+  telegram:
+    bot_token: ""    # Leave blank — set via CLEARTRACE_TELEGRAM_BOT_TOKEN env var
+    chat_id: ""      # Leave blank — set via CLEARTRACE_TELEGRAM_CHAT_ID env var
+  events:            # Which events trigger a notification
+    - scan_complete
+    - new_exposure_found
+    - removal_confirmed
+    - removal_failed
+    - relisting_detected
+
+# ── Re-verification ───────────────────────────────────────────────────────────
+# Days after a confirmed removal when TraceBurn re-checks the broker.
+# Brokers frequently re-list removed data. Re-verification catches this.
+# NOT SENSITIVE.
+
+reverification:
+  intervals_days: [7, 30, 90]        # Check at 7 days, 30 days, and 90 days post-removal
+
+# ── HIBP (Have I Been Pwned) ──────────────────────────────────────────────────
+# Breach database check. Requires a paid API key from haveibeenpwned.com.
+# SENSITIVE: api_key goes in an environment variable.
+#   export CLEARTRACE_HIBP_API_KEY='your-hibp-api-key'
+
+hibp:
+  api_key: ""        # Leave blank — set via CLEARTRACE_HIBP_API_KEY env var
+  enabled: true      # Set to false to skip HIBP breach checks entirely
+
+# ── Reporting ─────────────────────────────────────────────────────────────────
+# Controls report generation output.
+# NOT SENSITIVE.
+
+reporting:
+  output_dir: "reports/"             # Directory where reports are written
+  include_pii_in_export: false       # If true, reports contain plaintext PII
+                                     # WARNING: only enable if you will encrypt the output manually
+  default_format: "html"             # "html" | "pdf" | "json"
+
+# ── Where credentials actually go ─────────────────────────────────────────────
+#
+# This file (config.yaml):         Non-sensitive settings only. chmod 600.
+# ~/.traceburn/vault.enc (vault):  AES-256-GCM encrypted PII — name, DOB,
+#                                  addresses, phone, emails. Managed by TraceBurn.
+# config/email.env (SMTP):         SMTP username, password, server settings.
+#                                  chmod 600. Never commit to git.
+#
+# Environment variables (shell profile or .env file — chmod 600):
+#   CLEARTRACE_VAULT_PASSPHRASE    Your vault encryption passphrase
+#   CLEARTRACE_TELEGRAM_BOT_TOKEN  Telegram bot token
+#   CLEARTRACE_TELEGRAM_CHAT_ID    Telegram chat ID
+#   CLEARTRACE_HIBP_API_KEY        Have I Been Pwned API key

@@ -1,0 +1,68 @@
+# TraceBurn — Python Dependencies
+#
+# Install with:
+#   pip install -r requirements.txt
+#
+# Stdlib modules used (no install required):
+#   difflib, imaplib, smtplib, hashlib, json, sqlite3, logging, pathlib,
+#   dataclasses, abc, contextlib, datetime, typing, enum, re, string,
+#   urllib.parse, asyncio, time, random, ctypes, os, stat, sys, shutil
+
+# ── Core ──────────────────────────────────────────────────────────────────────
+
+# Playwright — browser automation for broker scraping and opt-out form submission
+playwright>=1.43.0
+
+# HTTP client — dork scanner, HIBP client, general broker requests
+requests>=2.31.0
+
+# Beautiful Soup — HTML parsing for DuckDuckGo results
+beautifulsoup4>=4.12.3
+lxml>=5.2.1
+
+# ── CLI & Terminal UI ─────────────────────────────────────────────────────────
+
+# Click — CLI framework for `traceburn` command group
+click>=8.1.7
+
+# Rich — terminal formatting, progress bars, panels, colour logging
+rich>=13.7.0
+
+# ── Configuration ─────────────────────────────────────────────────────────────
+
+# Pydantic v2 — config and data model validation
+pydantic>=2.6.0
+
+# Pydantic Settings — env var loading with CLEARTRACE_ prefix support
+pydantic-settings>=2.2.0
+
+# PyYAML — user.yaml and brokers.yaml parsing
+pyyaml>=6.0.1
+
+# python-dotenv — loading config/email.env credentials
+python-dotenv>=1.0.1
+
+# ── Cryptography ──────────────────────────────────────────────────────────────
+
+# cryptography — AES-256-GCM vault encryption and PBKDF2HMAC key derivation
+cryptography>=42.0.0
+
+# ── Scheduling ────────────────────────────────────────────────────────────────
+
+# APScheduler — background cron-based scan scheduler
+apscheduler>=3.10.4
+
+# ── Async HTTP ────────────────────────────────────────────────────────────────
+
+# aiohttp — async HTTP client for HIBP and other async requests
+aiohttp>=3.9.3
+
+# ── Templating ────────────────────────────────────────────────────────────────
+
+# Jinja2 — email opt-out templates and report HTML rendering
+jinja2>=3.1.3
+
+# ── PDF Export (optional) ─────────────────────────────────────────────────────
+
+# reportlab — PDF report generation (falls back to Markdown if not installed)
+reportlab>=4.1.0

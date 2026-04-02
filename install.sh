@@ -1,0 +1,311 @@
+#!/usr/bin/env bash
+# install.sh — TraceBurn Installer
+#
+# Sets up TraceBurn on macOS or Linux: creates directory structure, installs
+# Python dependencies in a virtualenv, installs Playwright's Chromium browser,
+# and adds the `traceburn` command to PATH.
+#
+# Usage:
+#   chmod +x install.sh
+#   ./install.sh           # Fresh install
+#   ./install.sh --upgrade # Re-install / update dependencies
+#
+# After install, run:
+#   traceburn init
+
+set -euo pipefail
+
+# ── Colour helpers ────────────────────────────────────────────────────────────
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+RESET='\033[0m'
+
+step()    { echo -e "\n${CYAN}${BOLD}▶  $*${RESET}"; }
+ok()      { echo -e "   ${GREEN}✓${RESET}  $*"; }
+warn()    { echo -e "   ${YELLOW}⚠${RESET}  $*"; }
+error()   { echo -e "   ${RED}✗${RESET}  $*" >&2; }
+fatal()   { error "$*"; exit 1; }
+
+# ── Flags ─────────────────────────────────────────────────────────────────────
+
+UPGRADE=false
+for arg in "$@"; do
+  case "$arg" in
+    --upgrade|-u) UPGRADE=true ;;
+    --help|-h)
+      echo "Usage: ./install.sh [--upgrade]"
+      echo ""
+      echo "  --upgrade   Re-install dependencies and update Playwright"
+      exit 0
+      ;;
+    *)
+      fatal "Unknown argument: $arg. Use --upgrade or --help."
+      ;;
+  esac
+done
+
+# ── Constants ─────────────────────────────────────────────────────────────────
+
+TRACEBURN_DIR="${HOME}/.traceburn"
+BIN_DIR="${TRACEBURN_DIR}/bin"
+VENV_DIR="${TRACEBURN_DIR}/venv"
+CONFIG_FILE="${TRACEBURN_DIR}/config.yaml"
+AUDIT_LOG="${TRACEBURN_DIR}/audit.log"
+
+# Project root is the directory containing this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ── Banner ────────────────────────────────────────────────────────────────────
+
+echo ""
+echo -e "${BOLD}╔══════════════════════════════════════════════════╗${RESET}"
+echo -e "${BOLD}║          TraceBurn — Installer                   ║${RESET}"
+echo -e "${BOLD}║  Know where your data lives. Remove it. Prove it.║${RESET}"
+echo -e "${BOLD}╚══════════════════════════════════════════════════╝${RESET}"
+echo ""
+
+if [ "${UPGRADE}" = true ]; then
+  echo -e "   ${YELLOW}Mode: Upgrade${RESET}"
+  echo ""
+fi
+
+# ── Detect OS ─────────────────────────────────────────────────────────────────
+
+step "Detecting operating system..."
+
+OS="$(uname -s)"
+case "${OS}" in
+  Darwin)
+    ok "macOS detected"
+    ;;
+  Linux)
+    ok "Linux detected"
+    ;;
+  *)
+    warn "Unsupported OS: ${OS}"
+    warn "TraceBurn is tested on macOS and Linux only."
+    warn "Continuing, but you may encounter issues."
+    ;;
+esac
+
+# ── Check Python 3.9+ ─────────────────────────────────────────────────────────
+
+step "Checking Python version..."
+
+if ! command -v python3 &>/dev/null; then
+  fatal "python3 is required but not found. Install Python 3.9+ and retry."
+fi
+
+PYTHON_VERSION="$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")"
+PYTHON_MAJOR="$(echo "${PYTHON_VERSION}" | cut -d. -f1)"
+PYTHON_MINOR="$(echo "${PYTHON_VERSION}" | cut -d. -f2)"
+
+if [[ "${PYTHON_MAJOR}" -lt 3 ]] || [[ "${PYTHON_MAJOR}" -eq 3 && "${PYTHON_MINOR}" -lt 9 ]]; then
+  fatal "Python 3.9+ is required. Found: ${PYTHON_VERSION}. Please upgrade Python and retry."
+fi
+
+ok "Python ${PYTHON_VERSION}"
+
+# ── Already installed? ────────────────────────────────────────────────────────
+
+if [ -d "${VENV_DIR}" ] && [ "${UPGRADE}" = false ]; then
+  echo ""
+  echo -e "   ${YELLOW}TraceBurn appears to already be installed at ${TRACEBURN_DIR}.${RESET}"
+  echo -e "   To update dependencies and Playwright, run:"
+  echo -e "   ${CYAN}  ./install.sh --upgrade${RESET}"
+  echo ""
+  read -rp "   Continue anyway (fresh re-install)? [y/N] " REPLY
+  if [[ ! "${REPLY}" =~ ^[Yy]$ ]]; then
+    echo ""
+    echo -e "   ${GREEN}✅ Nothing changed. Run: traceburn init${RESET}"
+    echo ""
+    exit 0
+  fi
+fi
+
+# ── Create directory structure ────────────────────────────────────────────────
+
+step "Creating ~/.traceburn/ directory structure..."
+
+mkdir -p "${TRACEBURN_DIR}"
+mkdir -p "${BIN_DIR}"
+mkdir -p "${TRACEBURN_DIR}/proof"
+mkdir -p "${TRACEBURN_DIR}/debug"
+mkdir -p "${TRACEBURN_DIR}/reports"
+mkdir -p "${TRACEBURN_DIR}/logs"
+
+ok "Directories created"
+
+# ── File permissions ──────────────────────────────────────────────────────────
+
+step "Setting secure file permissions..."
+
+chmod 700 "${TRACEBURN_DIR}"
+chmod 700 "${BIN_DIR}"
+chmod 700 "${TRACEBURN_DIR}/proof"
+chmod 700 "${TRACEBURN_DIR}/debug"
+chmod 700 "${TRACEBURN_DIR}/reports"
+chmod 700 "${TRACEBURN_DIR}/logs"
+
+# Config file — create from example if missing
+if [ ! -f "${CONFIG_FILE}" ]; then
+  if [ -f "${SCRIPT_DIR}/config/user.yaml.example" ]; then
+    cp "${SCRIPT_DIR}/config/user.yaml.example" "${CONFIG_FILE}"
+    ok "Created config.yaml from example template"
+  else
+    cat > "${CONFIG_FILE}" << 'YAML_EOF'
+# TraceBurn Configuration — generated by install.sh
+# See config/user.yaml.example for all available options.
+profile:
+  display_name: "Primary Profile"
+  profile_type: "primary"
+YAML_EOF
+    ok "Created minimal config.yaml"
+  fi
+fi
+chmod 600 "${CONFIG_FILE}"
+
+# Vault file — lock down if it exists
+VAULT_FILE="${TRACEBURN_DIR}/vault.enc"
+if [ -f "${VAULT_FILE}" ]; then
+  chmod 600 "${VAULT_FILE}"
+fi
+
+# Database — lock down if it exists
+DB_FILE="${TRACEBURN_DIR}/traceburn.db"
+if [ -f "${DB_FILE}" ]; then
+  chmod 600 "${DB_FILE}"
+fi
+
+# Audit log — create if missing
+if [ ! -f "${AUDIT_LOG}" ]; then
+  touch "${AUDIT_LOG}"
+  chmod 644 "${AUDIT_LOG}"
+fi
+
+ok "Permissions set (700 on dirs, 600 on config files)"
+
+# ── Virtual environment ───────────────────────────────────────────────────────
+
+step "Setting up Python virtual environment..."
+
+if [ ! -d "${VENV_DIR}" ]; then
+  python3 -m venv "${VENV_DIR}"
+  ok "Created virtualenv at ${VENV_DIR}"
+else
+  ok "Virtualenv already exists — reusing"
+fi
+
+# shellcheck source=/dev/null
+source "${VENV_DIR}/bin/activate"
+
+# Upgrade pip quietly
+"${VENV_DIR}/bin/pip" install --quiet --upgrade pip
+ok "pip upgraded"
+
+# ── Install dependencies ──────────────────────────────────────────────────────
+
+step "Installing Python dependencies..."
+
+REQUIREMENTS="${SCRIPT_DIR}/requirements.txt"
+if [ ! -f "${REQUIREMENTS}" ]; then
+  fatal "requirements.txt not found at ${REQUIREMENTS}. Run install.sh from the TraceBurn project root."
+fi
+
+"${VENV_DIR}/bin/pip" install --quiet -r "${REQUIREMENTS}"
+ok "Dependencies installed"
+
+# ── Install Playwright Chromium ───────────────────────────────────────────────
+
+step "Installing Playwright Chromium browser..."
+
+"${VENV_DIR}/bin/playwright" install chromium
+ok "Playwright Chromium installed"
+
+# On Linux, also install system dependencies (best-effort)
+if [[ "${OS}" == "Linux" ]]; then
+  step "Installing Playwright system dependencies (Linux)..."
+  "${VENV_DIR}/bin/playwright" install-deps chromium 2>/dev/null || \
+    warn "Could not install Playwright system deps. Run 'playwright install-deps' manually if scraping fails."
+fi
+
+# ── Create traceburn wrapper script ───────────────────────────────────────────
+
+step "Creating traceburn command..."
+
+WRAPPER="${BIN_DIR}/traceburn"
+
+cat > "${WRAPPER}" << WRAPPER_EOF
+#!/usr/bin/env bash
+# traceburn — generated by install.sh on $(date +%Y-%m-%d)
+# Project: ${SCRIPT_DIR}
+# Venv:    ${VENV_DIR}
+export PYTHONPATH="${SCRIPT_DIR}:\${PYTHONPATH:-}"
+exec "${VENV_DIR}/bin/python" "${SCRIPT_DIR}/src/cli.py" "\$@"
+WRAPPER_EOF
+
+chmod 755 "${WRAPPER}"
+ok "Created ${WRAPPER}"
+
+# ── Add to PATH ───────────────────────────────────────────────────────────────
+
+step "Updating PATH in shell profiles..."
+
+PATH_LINE="export PATH=\"\${HOME}/.traceburn/bin:\${PATH}\""
+PATH_COMMENT="# TraceBurn — added by install.sh"
+ADDED_TO_SHELL=false
+
+# ~/.zshrc
+ZSHRC="${HOME}/.zshrc"
+if [ -f "${ZSHRC}" ]; then
+  if ! grep -qF ".traceburn/bin" "${ZSHRC}" 2>/dev/null; then
+    { echo ""; echo "${PATH_COMMENT}"; echo "${PATH_LINE}"; } >> "${ZSHRC}"
+    ok "Added ~/.traceburn/bin to PATH in ~/.zshrc"
+    ADDED_TO_SHELL=true
+  else
+    ok "~/.traceburn/bin already in ~/.zshrc"
+  fi
+fi
+
+# ~/.bash_profile
+BASH_PROFILE="${HOME}/.bash_profile"
+if [ -f "${BASH_PROFILE}" ]; then
+  if ! grep -qF ".traceburn/bin" "${BASH_PROFILE}" 2>/dev/null; then
+    { echo ""; echo "${PATH_COMMENT}"; echo "${PATH_LINE}"; } >> "${BASH_PROFILE}"
+    ok "Added ~/.traceburn/bin to PATH in ~/.bash_profile"
+    ADDED_TO_SHELL=true
+  else
+    ok "~/.traceburn/bin already in ~/.bash_profile"
+  fi
+fi
+
+if [ "${ADDED_TO_SHELL}" = false ] && [ ! -f "${ZSHRC}" ] && [ ! -f "${BASH_PROFILE}" ]; then
+  warn "No ~/.zshrc or ~/.bash_profile found. Add this to your shell profile manually:"
+  echo "     ${PATH_LINE}"
+fi
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+
+echo ""
+echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo -e "${GREEN}${BOLD}  ✅  TraceBurn installed.                           ${RESET}"
+echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo ""
+echo -e "   Install location:  ${TRACEBURN_DIR}"
+echo -e "   Project root:      ${SCRIPT_DIR}"
+echo -e "   Python:            ${PYTHON_VERSION} (${VENV_DIR})"
+echo ""
+echo -e "   Next steps:"
+echo ""
+echo -e "   1. Open a new terminal (or run: ${CYAN}source ~/.zshrc${RESET})"
+echo ""
+echo -e "   2. Run the setup wizard:"
+echo -e "      ${CYAN}traceburn init${RESET}"
+echo ""
+echo -e "   ${YELLOW}Tip:${RESET} Store your vault passphrase somewhere safe."
+echo -e "   TraceBurn cannot recover it if forgotten."
+echo ""

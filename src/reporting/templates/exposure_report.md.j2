@@ -1,0 +1,188 @@
+{#
+  src/reporting/templates/exposure_report.md.j2
+  TraceBurn Exposure Report — Jinja2 Markdown template
+
+  Required variables:
+    profile_name    (str)  — Display name of the scanned profile, e.g. "John Smith"
+    scan_date       (str)  — Formatted scan timestamp, e.g. "2026-04-01 09:14:32 UTC"
+    scan_id         (str)  — UUID string identifying this scan
+    scan_type       (str)  — "full" | "spot_check" | "reverification"
+    stats           (dict) — Aggregate scan statistics:
+                               brokers_checked    (int)
+                               exposures_found    (int)
+                               previously_removed (int)
+                               reappeared         (int)
+                               duration_seconds   (int)
+                               risk_level         (str): "HIGH" | "MEDIUM" | "LOW" | "CLEAR"
+    brokers         (list) — List of broker findings (only brokers with exposures):
+                             Each item:
+                               name              (str)
+                               domain            (str)
+                               removal_tier      (int): 1 | 2 | 3
+                               region            (str)
+                               reappearance_note (str | None)
+                               exposure:
+                                 status             (str): "found" | "reappeared" | etc.
+                                 first_seen         (str)
+                                 last_seen          (str)
+                                 confidence_score   (float): 0.0–1.0
+                                 recommended_action (str)
+                                 data_fields        (list):
+                                   field_name  (str)
+                                   match_type  (str): "exact" | "partial" | "fuzzy"
+                                   confidence  (float)
+    brokers_clear   (list[str]) — Broker names with no exposure found
+    removal_summary (dict) — { submitted, confirmed, pending, failed } (int each)
+    breaches        (list) — Optional breach database results:
+                             Each: { source (str), breach_date (str), fields_exposed (list[str]) }
+    version         (str)  — TraceBurn version string, e.g. "0.1.0"
+
+  Sample rendered output:
+    # TraceBurn Exposure Report
+
+    **Generated:** 2026-04-01 09:14:32 UTC
+    **Scan ID:** a3f8c1d2-7e45-4b21-9f0a-123456789abc
+    **Scan Type:** full
+
+    ---
+
+    ## Profile Summary
+
+    | Field                        | Value         |
+    |------------------------------|---------------|
+    | Name                         | John Smith    |
+    | Brokers Checked              | 87            |
+    | Exposures Found              | 14            |
+    | Exposures Previously Removed | 3             |
+    | Reappearances Detected       | 1             |
+    | Scan Duration                | 312s          |
+
+    **Overall Risk Level:** HIGH
+
+    ---
+
+    ## Findings by Broker
+
+    ### Spokeo (spokeo.com)
+    ...
+#}
+# TraceBurn Exposure Report
+
+**Generated:** {{ scan_date }}
+**Scan ID:** {{ scan_id }}
+**Scan Type:** {{ scan_type }}
+
+---
+
+## Profile Summary
+
+| Field | Value |
+|-------|-------|
+| Name | {{ profile_name }} |
+| Brokers Checked | {{ stats.brokers_checked }} |
+| Exposures Found | {{ stats.exposures_found }} |
+| Exposures Previously Removed | {{ stats.previously_removed }} |
+| Reappearances Detected | {{ stats.reappeared }} |
+| Scan Duration | {{ stats.duration_seconds }}s |
+
+**Overall Risk Level:** {{ stats.risk_level }}
+
+---
+
+## Findings by Broker
+
+{% if brokers %}
+{% for finding in brokers %}
+### {{ finding.name }} ({{ finding.domain }})
+
+| Field | Value |
+|-------|-------|
+| Status | {{ finding.exposure.status }} |
+| First Seen | {{ finding.exposure.first_seen }} |
+| Last Seen | {{ finding.exposure.last_seen }} |
+| Confidence Score | {{ "%.2f" | format(finding.exposure.confidence_score) }} |
+| Data Fields Exposed | {{ finding.exposure.data_fields | map(attribute='field_name') | join(', ') }} |
+| Removal Tier | {{ finding.removal_tier }} ({% if finding.removal_tier == 1 %}automated{% elif finding.removal_tier == 2 %}email opt-out{% else %}manual{% endif %}) |
+| Recommended Action | {{ finding.exposure.recommended_action }} |
+
+**Exposed Fields Detail:**
+{% for f in finding.exposure.data_fields %}
+- `{{ f.field_name }}`: {{ f.match_type }} match (confidence: {{ "%.2f" | format(f.confidence) }})
+{% endfor %}
+
+{% if finding.reappearance_note %}
+⚠️  **REAPPEARANCE:** {{ finding.reappearance_note }}
+
+{% endif %}
+---
+{% endfor %}
+{% else %}
+*No broker exposures found in this scan.*
+
+---
+{% endif %}
+
+## Brokers Checked — No Exposure Found
+
+{% if brokers_clear %}
+{{ brokers_clear | join(', ') }}
+{% else %}
+*All checked brokers returned findings, or no clear-broker data is available.*
+{% endif %}
+
+---
+
+{% if breaches %}
+## Breach Database Results
+
+| Source | Breach Date | Fields Exposed |
+|--------|-------------|----------------|
+{% for breach in breaches %}
+| {{ breach.source }} | {{ breach.breach_date }} | {{ breach.fields_exposed | join(', ') }} |
+{% endfor %}
+
+---
+
+{% endif %}
+## Recommended Actions
+
+{% set ns = namespace(counter=1) %}
+{% set immediate = brokers | selectattr('exposure.recommended_action', 'equalto', 'submit_removal') | list %}
+{% set high = brokers | selectattr('exposure.recommended_action', 'equalto', 'confirm_and_submit') | list %}
+{% set review = brokers | selectattr('exposure.recommended_action', 'equalto', 'manual_review') | list %}
+{% set reverify = brokers | selectattr('exposure.recommended_action', 'equalto', 'reverify') | list %}
+
+{% for finding in immediate %}
+{{ ns.counter }}. **[IMMEDIATE]** Submit removal to {{ finding.name }} — {{ finding.exposure.data_fields | map(attribute='field_name') | join(', ') }}
+{% set ns.counter = ns.counter + 1 %}
+{% endfor %}
+{% for finding in high %}
+{{ ns.counter }}. **[HIGH]** Confirm and submit removal to {{ finding.name }} (confidence: {{ "%.2f" | format(finding.exposure.confidence_score) }})
+{% set ns.counter = ns.counter + 1 %}
+{% endfor %}
+{% for finding in review %}
+{{ ns.counter }}. **[REVIEW]** Manual review required at {{ finding.name }} — {{ finding.exposure.data_fields | map(attribute='field_name') | join(', ') }}
+{% set ns.counter = ns.counter + 1 %}
+{% endfor %}
+{% for finding in reverify %}
+{{ ns.counter }}. **[REVERIFY]** Re-verify current status at {{ finding.name }}
+{% set ns.counter = ns.counter + 1 %}
+{% endfor %}
+{% if not brokers %}
+*No actions required — no exposures found in this scan.*
+{% endif %}
+
+---
+
+## Removal Status Summary
+
+| Status | Count |
+|--------|-------|
+| Submitted | {{ removal_summary.submitted }} |
+| Confirmed Removed | {{ removal_summary.confirmed }} |
+| Pending Verification | {{ removal_summary.pending }} |
+| Failed / Needs Retry | {{ removal_summary.failed }} |
+
+---
+
+*Report generated by TraceBurn {{ version }} — data stays local, no cloud sync*

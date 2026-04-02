@@ -1,0 +1,376 @@
+# config/brokers.yaml — TraceBurn Broker Definitions
+#
+# All 20 data brokers covered by TraceBurn.
+# Fields:
+#   name:                        Human-readable broker name
+#   domain:                      Bare hostname (no scheme)
+#   region:                      US | EU | UK | global
+#   removal_tier:                1 (Playwright) | 2 (Email) | 3 (Manual)
+#   opt_out_url:                 Full URL of opt-out page
+#   requires_email_verification: true if email click required after form submit
+#   requires_phone_verification: true if phone call/SMS required
+#   requires_captcha:            true if CAPTCHA blocks automation
+#   requires_account:            true if a site account must be created
+#   removal_timeline_days:       Estimated days until listing is removed
+#   relisting_risk:              high | medium | low
+#   notes:                       Automation notes and caveats
+#
+# IMPORTANT: Opt-out URLs change. Verify all URLs before running automation.
+# Last verified: 2026-04-01
+
+brokers:
+
+  - name: Spokeo
+    domain: spokeo.com
+    region: US
+    removal_tier: 3
+    opt_out_url: https://www.spokeo.com/optout
+    playwright_script: spokeo.py
+    requires_captcha: true
+    relisting_risk: high
+    notes: >
+      CAPTCHA confirmed on opt-out form (live test 2026-04-01). 
+      Downgraded Tier 1 → Tier 3 (manual). Form auto-fill works but 
+      CAPTCHA blocks headless submit. Email confirmation auto-clickable 
+      once human completes CAPTCHA. Future fix: 2captcha integration.
+    requires_email_verification: true
+    requires_phone_verification: false
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 3
+    relisting_risk: high
+    notes: >
+      Must confirm via email link after form submission. Email confirmation
+      handled by tier2_email.py. Each listing URL must be submitted separately
+      if multiple profiles exist. Data pulled from public records monthly;
+      re-listing within 30–60 days is common.
+
+  - name: Whitepages
+    domain: whitepages.com
+    region: US
+    removal_tier: 3
+    opt_out_url: https://www.whitepages.com/suppression-requests
+    playwright_script: null
+    requires_email_verification: false
+    requires_phone_verification: true
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 1
+    relisting_risk: high
+    notes: >
+      Phone verification via call or SMS is a blocking manual step that
+      prevents full automation. Assigned to Tier 3 (manual wizard). Also
+      operates Whitepages Pro (B2B) with a separate opt-out process.
+
+  - name: Intelius
+    domain: intelius.com
+    region: US
+    removal_tier: 1
+    opt_out_url: https://www.intelius.com/opt-out
+    playwright_script: intelius.py
+    requires_email_verification: true
+    requires_phone_verification: false
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 3
+    relisting_risk: medium
+    notes: >
+      Form automatable; email confirmation required. Owned by PeopleConnect.
+      May share opt-out status with BeenVerified, TruthFinder, InstantCheckmate,
+      PeopleLooker, and USSearch — verify current network policy.
+      Also operates iSearch and PeopleLookup.
+
+  - name: BeenVerified
+    domain: beenverified.com
+    region: US
+    removal_tier: 1
+    opt_out_url: https://www.beenverified.com/app/optout/search
+    playwright_script: beenverified.py
+    requires_email_verification: true
+    requires_phone_verification: false
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 2
+    relisting_risk: medium
+    notes: >
+      Form automatable; email confirmation click required after submission.
+      Operated by PeopleConnect. Opt-out may propagate to TruthFinder,
+      InstantCheckmate, PeopleLooker, USSearch — confirm current network policy.
+      CCPA opt-out page available separately.
+
+  - name: MyLife
+    domain: mylife.com
+    region: US
+    removal_tier: 1
+    opt_out_url: https://www.mylife.com/ccpa/index.pubview
+    playwright_script: mylife.py
+    requires_email_verification: false
+    requires_phone_verification: false
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 30
+    relisting_risk: high
+    notes: >
+      CCPA deletion form is automatable. MyLife shows "reputation scores" in
+      Google results and is particularly damaging. Has faced FTC scrutiny.
+      Aggressively re-aggregates data; monitor closely. May require multiple
+      submissions over time.
+
+  - name: Radaris
+    domain: radaris.com
+    region: US
+    removal_tier: 3
+    opt_out_url: https://radaris.com/control/privacy
+    playwright_script: null
+    requires_email_verification: false
+    requires_phone_verification: false
+    requires_captcha: false
+    requires_account: true
+    removal_timeline_days: 3
+    relisting_risk: high
+    notes: >
+      Requires creating a free Radaris account before removal — account
+      creation is an automation friction point. Assigned to Tier 3 manual
+      wizard. Also operates Centeda.com, Clubset.com, and other subsidiary
+      sites that may need separate opt-outs.
+
+  - name: FamilyTreeNow
+    domain: familytreenow.com
+    region: US
+    removal_tier: 3
+    opt_out_url: https://www.familytreenow.com/optout
+    playwright_script: null
+    requires_email_verification: false
+    requires_phone_verification: false
+    requires_captcha: true
+    requires_account: false
+    removal_timeline_days: 1
+    relisting_risk: high
+    notes: >
+      CAPTCHA blocks automation — assigned to Tier 3 manual wizard. Exposes
+      relatives' names, DOBs, and address history publicly. High-priority
+      manual removal. Genealogical data is publicly sourced; re-lists frequently.
+
+  - name: PeopleFinders
+    domain: peoplefinders.com
+    region: US
+    removal_tier: 1
+    opt_out_url: https://www.peoplefinders.com/opt-out
+    playwright_script: peoplefinders.py
+    requires_email_verification: false
+    requires_phone_verification: false
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 2
+    relisting_risk: medium
+    notes: >
+      One of the cleaner opt-outs — no email confirmation required in most
+      cases. Also operates PeopleSmart; verify both are covered by the same
+      opt-out.
+
+  - name: ZabaSearch
+    domain: zabasearch.com
+    region: US
+    removal_tier: 2
+    opt_out_url: https://www.zabasearch.com
+    opt_out_email: privacyrequest@intelius.com
+    email_template: zabasearch_optout.j2
+    requires_email_verification: false
+    requires_phone_verification: false
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 30
+    relisting_risk: low
+    notes: >
+      Opt-out is via email to privacyrequest@intelius.com (owned by Intelius/
+      PeopleConnect). If Intelius opt-out succeeds, ZabaSearch may be covered.
+      Lower-traffic; less frequently updated.
+
+  - name: TruthFinder
+    domain: truthfinder.com
+    region: US
+    removal_tier: 1
+    opt_out_url: https://www.truthfinder.com/opt-out/
+    playwright_script: truthfinder.py
+    requires_email_verification: true
+    requires_phone_verification: false
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 2
+    relisting_risk: medium
+    notes: >
+      Form automatable; email verification required. Operated by PeopleConnect
+      alongside BeenVerified, InstantCheckmate, PeopleLooker. May share opt-out
+      propagation. Subscription-gated results may not be fully visible without
+      an account.
+
+  - name: InstantCheckmate
+    domain: instantcheckmate.com
+    region: US
+    removal_tier: 1
+    opt_out_url: https://www.instantcheckmate.com/opt-out/
+    playwright_script: instantcheckmate.py
+    requires_email_verification: true
+    requires_phone_verification: false
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 2
+    relisting_risk: medium
+    notes: >
+      PeopleConnect network. Form automatable; email confirmation required.
+      See BeenVerified notes on shared opt-out propagation across the network.
+
+  - name: CheckPeople
+    domain: checkpeople.com
+    region: US
+    removal_tier: 1
+    opt_out_url: https://checkpeople.com/opt-out
+    playwright_script: checkpeople.py
+    requires_email_verification: false
+    requires_phone_verification: false
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 2
+    relisting_risk: medium
+    notes: >
+      Smaller broker; fewer data points than the majors. No email confirmation
+      required in most flows. Worth removing from for completeness.
+
+  - name: PeopleLooker
+    domain: peoplelooker.com
+    region: US
+    removal_tier: 1
+    opt_out_url: https://www.peoplelooker.com/opt-out
+    playwright_script: peoplelooker.py
+    requires_email_verification: true
+    requires_phone_verification: false
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 2
+    relisting_risk: medium
+    notes: >
+      PeopleConnect network. Email confirmation required after form submission.
+
+  - name: USSearch
+    domain: ussearch.com
+    region: US
+    removal_tier: 3
+    opt_out_url: https://www.ussearch.com/consumer/ala/landing/
+    playwright_script: null
+    requires_email_verification: false
+    requires_phone_verification: true
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 30
+    relisting_risk: low
+    notes: >
+      PeopleConnect network. Phone verification is a blocking manual step;
+      assigned to Tier 3 wizard. 30-day removal timeline.
+
+  - name: Acxiom
+    domain: acxiom.com
+    region: US
+    removal_tier: 1
+    opt_out_url: https://isapps.acxiom.com/optout/optout.aspx
+    playwright_script: acxiom.py
+    requires_email_verification: false
+    requires_phone_verification: false
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 37
+    relisting_risk: medium
+    notes: >
+      One of the largest consumer data compilers. Removal from Acxiom can
+      have downstream effects since many smaller brokers source from it.
+      High-value removal target. Multi-step form is automatable. AboutTheData
+      portal at aboutthedata.com allows data review before opt-out.
+
+  - name: LexisNexis
+    domain: lexisnexis.com
+    region: US
+    removal_tier: 3
+    opt_out_url: https://optout.lexisnexis.com/
+    playwright_script: null
+    requires_email_verification: false
+    requires_phone_verification: false
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 60
+    relisting_risk: medium
+    notes: >
+      ID verification requirement blocks automation; assigned to Tier 3.
+      Major data compiler primarily serving B2B/legal/government. Certain
+      legally permissible uses cannot be suppressed. Full CCPA/GDPR deletion
+      is a separate process. 30–90 day removal timeline.
+
+  - name: Epsilon
+    domain: epsilon.com
+    region: US
+    removal_tier: 1
+    opt_out_url: https://www.epsilon.com/us/privacy-policy
+    playwright_script: epsilon.py
+    requires_email_verification: false
+    requires_phone_verification: false
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 45
+    relisting_risk: medium
+    notes: >
+      Major marketing data and loyalty program broker. Primarily B2B.
+      Also reachable via DMAchoice.org for broader marketing opt-out.
+      Epsilon data feeds into email marketing lists — high-priority for
+      reducing spam. 30–60 day removal timeline.
+
+  - name: Oracle Data Cloud
+    domain: datacloudoptout.oracle.com
+    region: global
+    removal_tier: 1
+    opt_out_url: https://datacloudoptout.oracle.com/
+    playwright_script: oracle_datacloud.py
+    requires_email_verification: false
+    requires_phone_verification: false
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 45
+    relisting_risk: medium
+    notes: >
+      Oracle Data Cloud (formerly BlueKai) aggregates online behavioural data
+      for ad targeting. Removal here reduces ad profiling. Also opt out of
+      Oracle Advertising separately. Cookie-based and name/address suppression
+      available. 30–60 day timeline.
+
+  - name: Experian Marketing Services
+    domain: experian.com
+    region: US
+    removal_tier: 1
+    opt_out_url: https://www.experian.com/privacy/center.html
+    playwright_script: experian.py
+    requires_email_verification: false
+    requires_phone_verification: false
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 37
+    relisting_risk: medium
+    notes: >
+      Opt out of Experian Marketing Services — distinct from credit reporting.
+      Credit freeze/opt-out is handled separately. For pre-approved credit and
+      insurance offers, use optoutprescreen.com (covers all four bureaus jointly).
+      30–45 day removal timeline.
+
+  - name: Equifax Marketing Services
+    domain: equifax.com
+    region: US
+    removal_tier: 1
+    opt_out_url: https://www.equifax.com/personal/privacy/
+    playwright_script: equifax.py
+    requires_email_verification: false
+    requires_phone_verification: false
+    requires_captcha: false
+    requires_account: false
+    removal_timeline_days: 45
+    relisting_risk: medium
+    notes: >
+      Opt out of Equifax IXI (wealth/income data) and Equifax Marketing
+      Services — distinct from credit bureau function. Joint credit opt-out
+      at optoutprescreen.com covers Equifax, Experian, TransUnion, and Innovis
+      for pre-approved offers. 30–60 day removal timeline.

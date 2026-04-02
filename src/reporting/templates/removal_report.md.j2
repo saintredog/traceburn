@@ -1,0 +1,168 @@
+{#
+  src/reporting/templates/removal_report.md.j2
+  TraceBurn Removal Progress Report — Jinja2 Markdown template
+
+  Required variables:
+    profile_name   (str)  — Display name of the profile, e.g. "Jane Smith"
+    generated_at   (str)  — Report generation timestamp, e.g. "2026-04-01 09:14:32 UTC"
+    period_start   (str)  — Start of the reporting period, e.g. "2026-03-10"
+    period_end     (str)  — End of the reporting period (typically today)
+    removals       (list) — List of removal records, each:
+                              broker_name      (str)
+                              removal_tier     (int): 1 | 2 | 3
+                              method           (str): "Playwright" | "Email" | "Manual"
+                              status           (str): "confirmed" | "pending" | "failed" | "reappeared"
+                              submitted_at     (str | None)
+                              confirmed_at     (str | None)
+                              days_to_confirm  (int | None)
+                              failure_reason   (str | None)
+                              retry_scheduled  (str | None)
+                              next_verify_at   (str | None)
+    summary        (dict) — {
+                               total      (int),
+                               submitted  (int),
+                               confirmed  (int),
+                               pending    (int),
+                               failed     (int),
+                               reappeared (int)
+                             }
+    proof_records  (list) — List of proof record entries, each:
+                              broker_name      (str)
+                              proof_type       (str): "Screenshot" | "HTTP 200" | "Manual"
+                              captured_at      (str)
+                              checksum_status  (str): "valid" | "invalid" | "missing"
+    proof_count    (int)  — Total proof records on file
+    checksum_ok    (int)  — Count of proofs with valid checksums
+    avg_days_confirmed (float | None) — Average days to confirmation (confirmed removals only)
+
+  Sample rendered output:
+    # TraceBurn Removal Progress Report
+
+    Generated: 2026-04-01 09:14:32 UTC
+    Period:    2026-03-10 → 2026-04-01
+
+    ## Summary Counts
+
+    | Status                 | Count |
+    |------------------------|-------|
+    | Total Removals Tracked | 14    |
+    ...
+#}
+# TraceBurn Removal Progress Report
+
+**Generated:** {{ generated_at }}
+**Period:** {{ period_start }} → {{ period_end }}
+**Profile:** {{ profile_name }}
+
+---
+
+## Summary Counts
+
+| Status | Count |
+|--------|-------|
+| Total Removals Tracked | {{ summary.total }} |
+| Submitted | {{ summary.submitted }} |
+| Confirmed Removed | {{ summary.confirmed }} |
+| Pending Verification | {{ summary.pending }} |
+| Failed / Retry Needed | {{ summary.failed }} |
+| Reappeared | {{ summary.reappeared }} |
+
+**Proof Records on File:** {{ proof_count }} records
+**Checksum Integrity:** {% if proof_count > 0 %}{% if checksum_ok == proof_count %}All valid ({{ checksum_ok }}/{{ proof_count }}){% else %}⚠️ {{ proof_count - checksum_ok }} invalid ({{ checksum_ok }}/{{ proof_count }} valid){% endif %}{% else %}N/A — no proof records yet{% endif %}
+
+{% if avg_days_confirmed is not none %}
+**Average days to confirmation** (confirmed only): {{ "%.1f" | format(avg_days_confirmed) }} days
+{% endif %}
+
+---
+
+## Per-Broker Status Table
+
+| Broker | Tier | Method | Submitted | Confirmed | Days | Status |
+|--------|------|--------|-----------|-----------|------|--------|
+{% for r in removals %}
+{% if r.status == 'confirmed' %}
+{% set status_icon = '✅ Confirmed' %}
+{% elif r.status == 'pending' %}
+{% set status_icon = '⏳ Pending' %}
+{% elif r.status == 'failed' %}
+{% set status_icon = '❌ Failed' %}
+{% elif r.status == 'reappeared' %}
+{% set status_icon = '⚠️ Reappeared' %}
+{% else %}
+{% set status_icon = r.status | title %}
+{% endif %}
+| {{ r.broker_name }} | {{ r.removal_tier }} | {{ r.method }} | {{ r.submitted_at or '—' }} | {{ r.confirmed_at or '—' }} | {{ r.days_to_confirm or '—' }} | {{ status_icon }} |
+{% endfor %}
+
+---
+
+## Proof Record Summary
+
+| Broker | Proof Type | Captured At | Checksum Status |
+|--------|------------|-------------|-----------------|
+{% for p in proof_records %}
+{% if p.checksum_status == 'valid' %}
+{% set cs_icon = '✅ Valid' %}
+{% elif p.checksum_status == 'invalid' %}
+{% set cs_icon = '❌ Invalid' %}
+{% else %}
+{% set cs_icon = '⚠️ Missing' %}
+{% endif %}
+| {{ p.broker_name }} | {{ p.proof_type }} | {{ p.captured_at }} | {{ cs_icon }} |
+{% endfor %}
+{% if not proof_records %}
+*No proof records on file yet.*
+{% endif %}
+
+---
+
+{% set failed = removals | selectattr('status', 'equalto', 'failed') | list %}
+{% if failed %}
+## Failed / Retry Queue
+
+| Broker | Failure Reason | Last Attempt | Retry Scheduled |
+|--------|----------------|--------------|-----------------|
+{% for r in failed %}
+| {{ r.broker_name }} | {{ r.failure_reason or 'Unknown' }} | {{ r.submitted_at or '—' }} | {{ r.retry_scheduled or 'Not scheduled' }} |
+{% endfor %}
+
+---
+
+{% endif %}
+## Verification Schedule
+
+| Broker | Confirmed Date | Next Verify |
+|--------|----------------|-------------|
+{% for r in removals | selectattr('status', 'equalto', 'confirmed') | list %}
+| {{ r.broker_name }} | {{ r.confirmed_at or '—' }} | {{ r.next_verify_at or '—' }} |
+{% endfor %}
+{% if not (removals | selectattr('status', 'equalto', 'confirmed') | list) %}
+*No confirmed removals yet — verification schedule will appear here after first confirmations.*
+{% endif %}
+
+---
+
+## Timeline
+
+```
+{% for r in removals %}
+{% set submitted_label = '[SUBMITTED ' + (r.submitted_at or '?') + ']' %}
+{% set confirmed_label = '[CONFIRMED ' + (r.confirmed_at or '?') + ']' if r.confirmed_at else '' %}
+{% if r.status == 'confirmed' %}
+{{ r.broker_name | ljust(18) }} {{ submitted_label }}──────────{{ confirmed_label }}──────────[VERIFY {{ r.next_verify_at or '?' }}]
+{% elif r.status == 'pending' %}
+{{ r.broker_name | ljust(18) }} {{ submitted_label }}────────────────────────────────────?[PENDING]
+{% elif r.status == 'failed' %}
+{{ r.broker_name | ljust(18) }} {{ submitted_label }}─────────────────────────────────────[FAILED]──[RETRY {{ r.retry_scheduled or '?' }}]
+{% elif r.status == 'reappeared' %}
+{{ r.broker_name | ljust(18) }} {{ submitted_label }}──────────{{ confirmed_label }}──[REAPPEARED]──[RE-REMOVAL SUBMITTED]
+{% else %}
+{{ r.broker_name | ljust(18) }} {{ submitted_label }}
+{% endif %}
+{% endfor %}
+```
+
+---
+
+*Report generated by TraceBurn — data stays local, no cloud sync*

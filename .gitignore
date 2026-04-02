@@ -1,0 +1,8 @@
+config/email.env
+config/user.yaml
+*.ctbak
+reports/
+*.db
+vault.enc
+__pycache__/
+.env

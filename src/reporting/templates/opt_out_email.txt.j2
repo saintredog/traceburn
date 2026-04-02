@@ -1,0 +1,144 @@
+{#
+  src/reporting/templates/opt_out_email.txt.j2
+  Generic opt-out / data removal request email body — Jinja2 plain-text template
+
+  Required variables:
+    broker_name   (str)  — Name of the data broker, e.g. "Spokeo"
+    user_name     (str)  — Full name of the requestor, e.g. "Jane M. Smith"
+    user_email    (str)  — Email address of the requestor
+    user_address  (str)  — Current mailing address of the requestor (single-line)
+    user_phone    (str)  — Phone number of the requestor (E.164 or formatted)
+    region        (str)  — "US" | "EU" | "UK" | "global" — selects legal basis language
+    legal_basis   (str)  — Override legal basis text (optional; auto-selected from region if omitted)
+    date          (str)  — Submission date, e.g. "April 1, 2026"
+
+  Optional variables:
+    user_dob      (str | None) — Date of birth if needed for broker matching (YYYY-MM-DD)
+    opt_out_url   (str | None) — Broker-specific opt-out URL to reference
+
+  Notes:
+    - If region is "EU" or "UK", the email references GDPR Article 17.
+    - If region is "US", the email references CCPA (California Consumer Privacy Act).
+    - For other regions, a generic privacy law reference is used.
+    - This template produces the message body only (no headers).
+      The Subject line should be set by the caller:
+        Subject: Data Removal Request — {{ user_name }}
+
+  Sample rendered output (US/CCPA):
+    Dear {{ broker_name }} Privacy Team,
+
+    I am writing to request the removal of my personal information...
+#}
+{% if region in ('EU', 'UK') %}
+{% set legal_ref = "Article 17 of the General Data Protection Regulation (GDPR 2016/679) (Right to Erasure)" %}
+{% set response_window = "30 days as required by Article 12 GDPR" %}
+{% elif region == 'US' %}
+{% set legal_ref = "the California Consumer Privacy Act (CCPA), Cal. Civ. Code § 1798.105, and applicable state privacy laws" %}
+{% set response_window = "45 days as required by applicable privacy law" %}
+{% else %}
+{% set legal_ref = "applicable data protection and privacy laws in your jurisdiction" %}
+{% set response_window = "30 days" %}
+{% endif %}
+Subject: Data Removal Request — {{ user_name }}
+
+Dear {{ broker_name }} Privacy / Data Protection Team,
+
+I am writing to formally request the deletion and opt-out of my personal
+information from your database and all products and services operated by
+{{ broker_name }}, pursuant to {{ legal_ref }}.
+
+---
+
+IDENTIFYING INFORMATION
+
+To help you locate my records, my identifying details are as follows:
+
+  Full name:    {{ user_name }}
+  Email:        {{ user_email }}
+  Address:      {{ user_address }}
+  Phone:        {{ user_phone }}
+{% if user_dob is defined and user_dob %}
+  Date of birth: {{ user_dob }}
+{% endif %}
+
+---
+
+REQUEST
+
+I request that {{ broker_name }} immediately:
+
+  1. Remove all personal information associated with me from your database,
+     including but not limited to my name, address, phone number, email
+     address, date of birth, and any other identifying information.
+
+  2. Opt me out of all current and future data collection, sale, sharing,
+     or disclosure of my personal information to any third party.
+
+  3. Remove my information from any people-search, background-check, or
+     public-records products you operate or provide data to.
+
+  4. Confirm in writing to {{ user_email }} that the deletion has been
+     completed and that you have notified any third parties to whom my
+     data was disclosed.
+
+---
+
+LEGAL BASIS
+{% if region in ('EU', 'UK') %}
+I exercise my right to erasure under Article 17 of the General Data
+Protection Regulation (GDPR 2016/679). The grounds for this request are:
+
+  [x] The data is no longer necessary for the purpose for which it was
+      collected or otherwise processed.
+  [ ] I withdraw consent upon which processing was based.
+  [ ] I object to processing under Article 21 GDPR.
+  [ ] The data has been unlawfully processed.
+
+Please note that failure to comply within the required timeframe may
+result in a complaint to the relevant supervisory authority
+{% if region == 'UK' %}(UK Information Commissioner's Office — ico.org.uk){% else %}(your national Data Protection Authority){% endif %}.
+{% elif region == 'US' %}
+Under the California Consumer Privacy Act (CCPA) and similar state privacy
+laws, consumers have the right to request deletion of their personal
+information. I am exercising that right with this request.
+
+If you believe an exemption applies, please specify the legal basis in
+your response. I reserve all rights to escalate this matter to the
+California Privacy Protection Agency or relevant state authority if
+my request is not honored.
+{% else %}
+I make this request pursuant to applicable data protection and privacy
+laws. Please confirm the legal basis under which you hold my data, and
+the steps taken to comply with this removal request.
+{% endif %}
+
+---
+
+I expect a response confirming deletion within {{ response_window }}.
+
+If you require any additional information to locate my records in your
+system, please contact me at {{ user_email }}.
+{% if opt_out_url is defined and opt_out_url %}
+
+I note that {{ broker_name }} operates an opt-out page at:
+  {{ opt_out_url }}
+
+I am submitting this request via email in addition to any online form,
+as email provides an auditable record of the request.
+{% endif %}
+
+Thank you for your prompt attention to this matter.
+
+Sincerely,
+
+{{ user_name }}
+{{ user_email }}
+{{ user_address }}
+{{ user_phone }}
+
+Date: {{ date }}
+
+---
+This request was generated and sent by TraceBurn on behalf of {{ user_name }}.
+TraceBurn is a personal data removal tool. It does not represent a legal
+service and this email does not constitute legal advice.

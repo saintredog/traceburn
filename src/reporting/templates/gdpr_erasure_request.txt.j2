@@ -1,0 +1,210 @@
+{#
+  src/reporting/templates/gdpr_erasure_request.txt.j2
+  GDPR Article 17 Right to Erasure (Right to be Forgotten) formal letter
+  For EU and UK data brokers. References GDPR 2016/679 and UK GDPR.
+
+  Required variables:
+    company_name    (str)       — Full legal name of the data controller, e.g. "Pipl Ltd."
+    user_name       (str)       — Full name of the data subject, e.g. "Jane M. Smith"
+    user_email      (str)       — Email address of the data subject
+    user_address    (str)       — Current postal address (single-line or multi-line)
+    erasure_grounds (list[str]) — One or more grounds for erasure from the list:
+                                    "no_longer_necessary"
+                                    "consent_withdrawn"
+                                    "article_21_objection"
+                                    "unlawful_processing"
+                                    "legal_obligation"
+    date            (str)       — Letter date, e.g. "1 April 2026"
+
+  Optional variables:
+    user_dob        (str | None) — Date of birth for identification (YYYY-MM-DD or formatted)
+    user_phone      (str | None) — Phone number for identification
+    dpo_name        (str | None) — Name of Data Protection Officer if known
+    region          (str)        — "EU" (default) or "UK" — selects applicable law references
+    deadline_days   (int)        — Response deadline in days (default: 30 per GDPR Article 12)
+
+  Ground codes map to Article 17(1) sub-paragraphs:
+    no_longer_necessary  → Article 17(1)(a)
+    consent_withdrawn    → Article 17(1)(b)
+    article_21_objection → Article 17(1)(c)
+    unlawful_processing  → Article 17(1)(d)
+    legal_obligation     → Article 17(1)(e)
+
+  Sample rendered output:
+    [Your Name]
+    [Your Address]
+    [Your Email]
+    [Date]
+
+    To the Data Protection Officer / Privacy Team,
+    [Company Name]
+
+    SUBJECT: Right to Erasure Request — Article 17 GDPR
+    ...
+#}
+{% if region is defined and region == 'UK' %}
+{% set gdpr_ref = "UK GDPR (as retained in UK law by the European Union (Withdrawal) Act 2018)" %}
+{% set authority_name = "the Information Commissioner's Office (ICO)" %}
+{% set authority_url = "ico.org.uk/make-a-complaint" %}
+{% set art12_ref = "Article 12 UK GDPR" %}
+{% set art17_ref = "Article 17 UK GDPR" %}
+{% set art21_ref = "Article 21 UK GDPR" %}
+{% else %}
+{% set gdpr_ref = "the General Data Protection Regulation (GDPR 2016/679)" %}
+{% set authority_name = "the relevant national Data Protection Authority" %}
+{% set authority_url = "edpb.europa.eu/about-edpb/about-edpb/members_en" %}
+{% set art12_ref = "Article 12 GDPR" %}
+{% set art17_ref = "Article 17 GDPR" %}
+{% set art21_ref = "Article 21 GDPR" %}
+{% endif %}
+{% set deadline = deadline_days | default(30) %}
+{{ user_name }}
+{{ user_address }}
+{{ user_email }}
+{% if user_phone is defined and user_phone %}
+{{ user_phone }}
+{% endif %}
+
+{{ date }}
+
+{% if dpo_name is defined and dpo_name %}
+{{ dpo_name }}
+Data Protection Officer
+{% else %}
+Data Protection Officer / Privacy Team
+{% endif %}
+{{ company_name }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SUBJECT: Formal Right to Erasure Request — {{ art17_ref }} (Right to be Forgotten)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Dear Data Protection Officer,
+
+I am writing to formally exercise my right to erasure under {{ art17_ref }} of
+{{ gdpr_ref }}. I request that {{ company_name }} erase without undue delay
+all personal data you hold about me as described below.
+
+───────────────────────────────────────────────────────────
+1. DATA SUBJECT IDENTIFICATION
+───────────────────────────────────────────────────────────
+
+  Full name:     {{ user_name }}
+  Email address: {{ user_email }}
+  Postal address: {{ user_address }}
+{% if user_dob is defined and user_dob %}
+  Date of birth: {{ user_dob }}
+{% endif %}
+{% if user_phone is defined and user_phone %}
+  Phone number:  {{ user_phone }}
+{% endif %}
+
+Please search for my data under all of the above identifiers. If you
+require any further information to locate my records in your systems,
+please contact me at {{ user_email }} before the response deadline below.
+
+───────────────────────────────────────────────────────────
+2. GROUNDS FOR ERASURE
+───────────────────────────────────────────────────────────
+
+I request erasure on the following ground(s) under {{ art17_ref }}(1):
+
+{% for ground in erasure_grounds %}
+{% if ground == 'no_longer_necessary' %}
+  [x] Article 17(1)(a) — The personal data are no longer necessary in
+      relation to the purposes for which they were collected or otherwise
+      processed. I did not provide consent for my data to be compiled
+      and published by a data aggregation or people-search service.
+{% elif ground == 'consent_withdrawn' %}
+  [x] Article 17(1)(b) — I withdraw the consent on which processing is
+      based, and there is no other legal ground for processing.
+{% elif ground == 'article_21_objection' %}
+  [x] Article 17(1)(c) — I object to the processing pursuant to
+      {{ art21_ref }}, and there are no overriding legitimate grounds
+      for the processing.
+{% elif ground == 'unlawful_processing' %}
+  [x] Article 17(1)(d) — The personal data have been unlawfully
+      processed. Processing my personal data without a lawful basis
+      under Article 6 GDPR constitutes unlawful processing.
+{% elif ground == 'legal_obligation' %}
+  [x] Article 17(1)(e) — The personal data must be erased for compliance
+      with a legal obligation in Union or Member State law to which the
+      controller is subject.
+{% else %}
+  [x] {{ ground }}
+{% endif %}
+{% endfor %}
+
+───────────────────────────────────────────────────────────
+3. SCOPE OF ERASURE REQUEST
+───────────────────────────────────────────────────────────
+
+I request that {{ company_name }} erases all personal data held about me,
+including but not limited to:
+
+  • Full name and any name variants
+  • Current and historical postal addresses
+  • Email addresses
+  • Telephone numbers
+  • Date of birth and age
+  • Relatives, associates, or household members linked to my record
+  • Employment information
+  • Any photographs or images
+  • Any inferred or derived data based on the above
+  • Any unique identifiers (cookies, device IDs, advertising IDs)
+
+I further request that {{ company_name }}:
+
+  1. Ceases all further processing of my personal data;
+  2. Does not re-collect or re-publish my data from public records or
+     third-party sources after erasure;
+  3. Notifies all third parties to whom my personal data has been
+     disclosed ({{ art17_ref }}(2)); and
+  4. Confirms in writing to {{ user_email }} that:
+       (a) All personal data about me has been erased, and
+       (b) All third parties have been notified of the erasure.
+
+───────────────────────────────────────────────────────────
+4. RESPONSE DEADLINE
+───────────────────────────────────────────────────────────
+
+Under {{ art12_ref }}, you are required to respond to this request without
+undue delay, and no later than {{ deadline }} days from receipt of this letter.
+
+If you intend to extend the response period by a further two months under
+{{ art12_ref }}(3), you must notify me within {{ deadline }} days of receipt,
+stating the reasons for the extension.
+
+───────────────────────────────────────────────────────────
+5. RIGHT TO LODGE A COMPLAINT
+───────────────────────────────────────────────────────────
+
+If {{ company_name }} fails to comply with this request, or if I do not
+receive a satisfactory response within {{ deadline }} days, I reserve the
+right to lodge a complaint with {{ authority_name }}.
+
+{% if region is defined and region == 'UK' %}
+Information Commissioner's Office: {{ authority_url }}
+{% else %}
+Details of national supervisory authorities: {{ authority_url }}
+{% endif %}
+
+I also reserve the right to seek judicial remedy under Article 79 GDPR.
+
+───────────────────────────────────────────────────────────
+
+I trust that {{ company_name }} will comply with its obligations under
+{{ gdpr_ref }} and process this request promptly.
+
+Yours faithfully,
+
+{{ user_name }}
+
+───────────────────────────────────────────────────────────
+This letter was prepared by TraceBurn, a personal data removal tool,
+on behalf of {{ user_name }}. TraceBurn is not a legal service and
+this letter does not constitute legal advice. If you require legal
+counsel, please consult a qualified data protection solicitor.
+───────────────────────────────────────────────────────────
